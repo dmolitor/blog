@@ -38,6 +38,11 @@ vignettes/*.pdf
 
 # R Environment Variables
 .Renviron
+.Rprofile
+
+# Renv stuff
+renv/
+
 
 # pkgdown site
 docs/
@@ -47,3 +52,6 @@ po/*~
 
 # RStudio Connect folder
 rsconnect/
+
+.DS_Store
+/.quarto/
