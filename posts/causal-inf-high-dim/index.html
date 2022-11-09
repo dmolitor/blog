@@ -1,0 +1,556 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.1.251">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+<meta name="dcterms.date" content="2022-11-08">
+<meta name="description" content="Estimators and honest confidence bands for a variety of treatment effects including local average (LATE) and average treatment effects (ATE) in data-rich environments.">
+
+<title>Snippets of Things - Program Evaluation and Causal Inference with High-Dimensional Data</title>
+<style>
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1.6em;
+  vertical-align: middle;
+}
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+    color: #aaaaaa;
+  }
+pre.numberSource { margin-left: 3em; border-left: 1px solid #aaaaaa;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+code span.al { color: #ff0000; font-weight: bold; } /* Alert */
+code span.an { color: #60a0b0; font-weight: bold; font-style: italic; } /* Annotation */
+code span.at { color: #7d9029; } /* Attribute */
+code span.bn { color: #40a070; } /* BaseN */
+code span.bu { color: #008000; } /* BuiltIn */
+code span.cf { color: #007020; font-weight: bold; } /* ControlFlow */
+code span.ch { color: #4070a0; } /* Char */
+code span.cn { color: #880000; } /* Constant */
+code span.co { color: #60a0b0; font-style: italic; } /* Comment */
+code span.cv { color: #60a0b0; font-weight: bold; font-style: italic; } /* CommentVar */
+code span.do { color: #ba2121; font-style: italic; } /* Documentation */
+code span.dt { color: #902000; } /* DataType */
+code span.dv { color: #40a070; } /* DecVal */
+code span.er { color: #ff0000; font-weight: bold; } /* Error */
+code span.ex { } /* Extension */
+code span.fl { color: #40a070; } /* Float */
+code span.fu { color: #06287e; } /* Function */
+code span.im { color: #008000; font-weight: bold; } /* Import */
+code span.in { color: #60a0b0; font-weight: bold; font-style: italic; } /* Information */
+code span.kw { color: #007020; font-weight: bold; } /* Keyword */
+code span.op { color: #666666; } /* Operator */
+code span.ot { color: #007020; } /* Other */
+code span.pp { color: #bc7a00; } /* Preprocessor */
+code span.sc { color: #4070a0; } /* SpecialChar */
+code span.ss { color: #bb6688; } /* SpecialString */
+code span.st { color: #4070a0; } /* String */
+code span.va { color: #19177c; } /* Variable */
+code span.vs { color: #4070a0; } /* VerbatimString */
+code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warning */
+</style>
+
+
+<script src="../../site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="../../site_libs/clipboard/clipboard.min.js"></script>
+<script src="../../site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="../../site_libs/quarto-search/fuse.min.js"></script>
+<script src="../../site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="../../">
+<link href="../../media/_favicon.png" rel="icon" type="image/png">
+<script src="../../site_libs/quarto-html/quarto.js"></script>
+<script src="../../site_libs/quarto-html/popper.min.js"></script>
+<script src="../../site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="../../site_libs/quarto-html/anchor.min.js"></script>
+<link href="../../site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="../../site_libs/quarto-html/quarto-syntax-highlighting.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="../../site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="../../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="../../site_libs/bootstrap/bootstrap.min.css" rel="stylesheet" id="quarto-bootstrap" data-mode="light">
+<script id="quarto-search-options" type="application/json">{
+  "location": "navbar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "end",
+  "type": "overlay",
+  "limit": 20,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit"
+  }
+}</script>
+
+  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml-full.js" type="text/javascript"></script>
+
+<link rel="stylesheet" href="../../styles.css">
+</head>
+
+<body class="floating nav-fixed">
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+    <nav class="navbar navbar-expand-lg navbar-dark ">
+      <div class="navbar-container container-fluid">
+      <div class="navbar-brand-container">
+    <a class="navbar-brand" href="../../index.html">
+    <span class="navbar-title">Snippets of Things</span>
+    </a>
+  </div>
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" aria-expanded="false" aria-label="Toggle navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+  <span class="navbar-toggler-icon"></span>
+</button>
+          <div class="collapse navbar-collapse" id="navbarCollapse">
+            <ul class="navbar-nav navbar-nav-scroll ms-auto">
+  <li class="nav-item">
+    <a class="nav-link" href="https://dmolitor.com">Home</a>
+  </li>  
+  <li class="nav-item compact">
+    <a class="nav-link" href="https://github.com/dmolitor/blog"><i class="bi bi-github" role="img">
+</i> 
+ </a>
+  </li>  
+</ul>
+              <div id="quarto-search" class="" title="Search"></div>
+          </div> <!-- /navcollapse -->
+      </div> <!-- /container-fluid -->
+    </nav>
+</header>
+<!-- content -->
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
+<!-- sidebar -->
+  <nav id="quarto-sidebar" class="sidebar collapse sidebar-navigation floating overflow-auto">
+    <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">On this page</h2>
+   
+  <ul>
+  <li><a href="#packages" id="toc-packages" class="nav-link active" data-scroll-target="#packages">Packages</a></li>
+  <li><a href="#study-data" id="toc-study-data" class="nav-link" data-scroll-target="#study-data">Study Data</a></li>
+  <li><a href="#model-specification" id="toc-model-specification" class="nav-link" data-scroll-target="#model-specification">Model Specification</a></li>
+  <li><a href="#first-stage-estimates" id="toc-first-stage-estimates" class="nav-link" data-scroll-target="#first-stage-estimates">First-Stage Estimates</a>
+  <ul class="collapse">
+  <li><a href="#conditional-expected-outcomes" id="toc-conditional-expected-outcomes" class="nav-link" data-scroll-target="#conditional-expected-outcomes">Conditional Expected Outcomes</a></li>
+  <li><a href="#calculate-late" id="toc-calculate-late" class="nav-link" data-scroll-target="#calculate-late">Calculate LATE</a></li>
+  <li><a href="#confidence-via-bootstrap" id="toc-confidence-via-bootstrap" class="nav-link" data-scroll-target="#confidence-via-bootstrap">Confidence via Bootstrap</a></li>
+  </ul></li>
+  <li><a href="#conclusion" id="toc-conclusion" class="nav-link" data-scroll-target="#conclusion">Conclusion</a></li>
+  </ul>
+</nav>
+</nav>
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+    </div>
+<!-- main -->
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">Program Evaluation and Causal Inference with High-Dimensional Data</h1>
+<p class="subtitle lead">A. Belloni, V. Chernozhukov, I. Fernandez-Val, C. Hansen</p>
+  <div class="quarto-categories">
+    <div class="quarto-category">ML</div>
+    <div class="quarto-category">Causal Inference</div>
+  </div>
+  </div>
+
+<div>
+  <div class="description">
+    Estimators and honest confidence bands for a variety of treatment effects including local average (LATE) and average treatment effects (ATE) in data-rich environments.
+  </div>
+</div>
+
+
+<div class="quarto-title-meta">
+
+    
+    <div>
+    <div class="quarto-title-meta-heading">Published</div>
+    <div class="quarto-title-meta-contents">
+      <p class="date">November 8, 2022</p>
+    </div>
+  </div>
+    
+  </div>
+  
+
+</header>
+
+<section id="packages" class="level2">
+<h2 class="anchored" data-anchor-id="packages">Packages</h2>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb1"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(dplyr)</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(glmnet)</span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(here)</span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(Matrix)</span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(readr)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div class="cell">
+<style type="text/css">
+.justify {
+  text-align: justify !important
+}
+</style>
+</div>
+<div class="justify">
+<p>This will be replicating (to a small degree), <a href="https://doi.org/10.3982/ECTA12723">Chernozhukov et al.’s work</a> on estimating causal effects in high-dimensional settings. This work demonstrates how to estimate treatment effects including LATE (in an Instrumental Variables setting) and ATE among others, as well as constructing honest confidence bands. They demonstrate this within a specific empirical setting. This setting is a prior study which uses Instrumental Variables estimation to quantify the effect of 401(k) participation on accumulated assets. The instrument in this setting is 401(k) eligibility which is arguably exogenous after conditioning on income and other related confounders.</p>
+</div>
+</section>
+<section id="study-data" class="level2">
+<h2 class="anchored" data-anchor-id="study-data">Study Data</h2>
+<div class="justify">
+<p>First, I will import the data that this study is based on.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb2"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>iv_data <span class="ot">&lt;-</span> <span class="fu">read_tsv</span>(<span class="fu">here</span>(<span class="st">"posts/causal-inf-high-dim/data/high-dim-iv.dat"</span>))</span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a><span class="co"># Variable transformations</span></span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a>iv_data <span class="ot">&lt;-</span> iv_data <span class="sc">|&gt;</span></span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(</span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a>    <span class="at">age =</span> (age <span class="sc">-</span> <span class="dv">25</span>)<span class="sc">/</span>(<span class="dv">64</span> <span class="sc">-</span> <span class="dv">25</span>),</span>
+<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a>    <span class="at">inc =</span> (inc <span class="sc">+</span> <span class="dv">2652</span>)<span class="sc">/</span>(<span class="dv">242124</span> <span class="sc">+</span> <span class="dv">2652</span>),</span>
+<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a>    <span class="at">fsize =</span> fsize<span class="sc">/</span><span class="dv">13</span>,</span>
+<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a>    <span class="at">educ =</span> educ<span class="sc">/</span><span class="dv">18</span></span>
+<span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a>  )</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>The primary variables of interest are our continuous outcome <span class="math inline">\(Y=\)</span> Total Assets, our binary instrument <span class="math inline">\(Z=\)</span> 401(k) Eligibility, and our binary treatment <span class="math inline">\(D=\)</span> 401(k) Participation. The definitions of all the rest of these variables are kind of obscure, and I’m not sure what they all are exactly. However, they define their specification precisely so I’m simply going to mirror what they use in their paper.</p>
+</div>
+</section>
+<section id="model-specification" class="level2">
+<h2 class="anchored" data-anchor-id="model-specification">Model Specification</h2>
+<div class="justify">
+<p>The specification of the full set of controls they construct is defined below as <code>iv_control_spec</code>. It’s a pretty hairy model spec! Let’s create the input matrix and check it’s dimensions.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb3"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>iv_control_spec <span class="ot">&lt;-</span> <span class="er">~</span> (</span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>  (</span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>    marr <span class="sc">+</span> twoearn <span class="sc">+</span> db <span class="sc">+</span> pira <span class="sc">+</span> hown <span class="sc">+</span> age <span class="sc">+</span> <span class="fu">I</span>(age<span class="sc">^</span><span class="dv">2</span>) <span class="sc">+</span> <span class="fu">I</span>(age<span class="sc">^</span><span class="dv">3</span>)</span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a>    <span class="sc">+</span> educ <span class="sc">+</span> <span class="fu">I</span>(educ<span class="sc">^</span><span class="dv">2</span>) <span class="sc">+</span> fsize <span class="sc">+</span> <span class="fu">I</span>(fsize<span class="sc">^</span><span class="dv">2</span>)</span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a>  )<span class="sc">^</span><span class="dv">2</span></span>
+<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a>  <span class="sc">*</span> (i1 <span class="sc">+</span> i2 <span class="sc">+</span> i3 <span class="sc">+</span> i4 <span class="sc">+</span> i5 <span class="sc">+</span> i6 <span class="sc">+</span> i6 <span class="sc">+</span> inc <span class="sc">+</span> <span class="fu">I</span>(inc<span class="sc">^</span><span class="dv">2</span>))</span>
+<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a>  <span class="sc">+</span> (i1 <span class="sc">+</span> i2 <span class="sc">+</span> i3 <span class="sc">+</span> i4 <span class="sc">+</span> i5 <span class="sc">+</span> i6 <span class="sc">+</span> i6 <span class="sc">+</span> inc <span class="sc">+</span> <span class="fu">I</span>(inc<span class="sc">^</span><span class="dv">2</span>))<span class="sc">^</span><span class="dv">2</span></span>
+<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a>) <span class="sc">-</span> <span class="dv">1</span></span>
+<span id="cb3-9"><a href="#cb3-9" aria-hidden="true" tabindex="-1"></a>iv_X <span class="ot">&lt;-</span> <span class="fu">sparse.model.matrix</span>(iv_control_spec, <span class="at">data =</span> iv_data)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div class="cell">
+<div class="cell-output cell-output-stdout">
+<pre><code>N Observations: 9915; N Confounders: 738</code></pre>
+</div>
+</div>
+<p>While this isn’t quite the full set of potential controls considered in the paper, it should be close enough to get the point across.</p>
+</div>
+</section>
+<section id="first-stage-estimates" class="level2">
+<h2 class="anchored" data-anchor-id="first-stage-estimates">First-Stage Estimates</h2>
+<section id="conditional-expected-outcomes" class="level3">
+<h3 class="anchored" data-anchor-id="conditional-expected-outcomes">Conditional Expected Outcomes</h3>
+<div class="justify">
+<p>In order to calculate the LATE in our IV framework, we will estimate the following expected values: <span class="math inline">\(E[Y|Z=0,X]\)</span>, <span class="math inline">\(E[Y|Z=1,X]\)</span>, <span class="math inline">\(E[D|Z=1,X]\)</span>, and <span class="math inline">\(E[Z|X]\)</span> using post-LASSO estimates for each of these values. Let’s get to estimating! As in the paper, we will estimate using LASSO with a pre-determined, data-driven choice of regularization parameter, <span class="math inline">\(\lambda\)</span>.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb5"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>N <span class="ot">&lt;-</span> <span class="fu">nrow</span>(iv_X)</span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>P <span class="ot">&lt;-</span> <span class="fu">ncol</span>(iv_X)</span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a><span class="co"># Data-driven regularization parameters</span></span>
+<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a>lambda <span class="ot">&lt;-</span> <span class="fl">2.2</span> <span class="sc">*</span> <span class="fu">sqrt</span>(N) <span class="sc">*</span> <span class="fu">qnorm</span>(<span class="dv">1</span> <span class="sc">-</span> (<span class="fl">0.1</span><span class="sc">/</span><span class="fu">log</span>(N))<span class="sc">/</span>(<span class="dv">2</span> <span class="sc">*</span> (<span class="dv">2</span> <span class="sc">*</span> P)))</span>
+<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a>logit_lambda <span class="ot">&lt;-</span> lambda<span class="sc">/</span>(<span class="dv">2</span> <span class="sc">*</span> N)</span>
+<span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-8"><a href="#cb5-8" aria-hidden="true" tabindex="-1"></a><span class="co"># Estimate models where instrument == 0</span></span>
+<span id="cb5-9"><a href="#cb5-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-10"><a href="#cb5-10" aria-hidden="true" tabindex="-1"></a><span class="do">## Outcome Post-LASSO model</span></span>
+<span id="cb5-11"><a href="#cb5-11" aria-hidden="true" tabindex="-1"></a>id_z0 <span class="ot">&lt;-</span> iv_data<span class="sc">$</span>e401 <span class="sc">==</span> <span class="dv">0</span></span>
+<span id="cb5-12"><a href="#cb5-12" aria-hidden="true" tabindex="-1"></a>ey_z0 <span class="ot">&lt;-</span> <span class="fu">glmnet</span>(<span class="at">x =</span> iv_X[id_z0, ], <span class="at">y =</span> iv_data<span class="sc">$</span>tw[id_z0], <span class="at">lambda =</span> lambda)</span>
+<span id="cb5-13"><a href="#cb5-13" aria-hidden="true" tabindex="-1"></a>ey_z0_selected <span class="ot">&lt;-</span> <span class="fu">names</span>((c <span class="ot">&lt;-</span> <span class="fu">coef</span>(ey_z0))[(<span class="fu">drop</span>(c) <span class="sc">!=</span> <span class="dv">0</span>), ])</span>
+<span id="cb5-14"><a href="#cb5-14" aria-hidden="true" tabindex="-1"></a>ey_z0_post_data <span class="ot">&lt;-</span> <span class="fu">cbind</span>(<span class="at">tw =</span> iv_data<span class="sc">$</span>tw[id_z0], <span class="fu">as.matrix</span>(iv_X[id_z0, ]))</span>
+<span id="cb5-15"><a href="#cb5-15" aria-hidden="true" tabindex="-1"></a>ey_z0_post_form <span class="ot">&lt;-</span> <span class="fu">paste</span>(<span class="st">"tw ~"</span>, <span class="fu">paste0</span>(ey_z0_selected[<span class="sc">-</span><span class="dv">1</span>], <span class="at">collapse =</span> <span class="st">"+"</span>))</span>
+<span id="cb5-16"><a href="#cb5-16" aria-hidden="true" tabindex="-1"></a>ey_z0_lm <span class="ot">&lt;-</span> <span class="fu">lm</span>(<span class="fu">formula</span>(ey_z0_post_form), <span class="at">data =</span> <span class="fu">as.data.frame</span>(ey_z0_post_data))</span>
+<span id="cb5-17"><a href="#cb5-17" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-18"><a href="#cb5-18" aria-hidden="true" tabindex="-1"></a><span class="do">## Treatment Post-LASSO model - not needed (E[D] = 0, since D = 1 iff Z = 1)</span></span>
+<span id="cb5-19"><a href="#cb5-19" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-20"><a href="#cb5-20" aria-hidden="true" tabindex="-1"></a><span class="co"># Estimate models where instrument == 1</span></span>
+<span id="cb5-21"><a href="#cb5-21" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-22"><a href="#cb5-22" aria-hidden="true" tabindex="-1"></a><span class="do">## Outcome Post-LASSO model</span></span>
+<span id="cb5-23"><a href="#cb5-23" aria-hidden="true" tabindex="-1"></a>id_z1 <span class="ot">&lt;-</span> iv_data<span class="sc">$</span>e401 <span class="sc">==</span> <span class="dv">1</span></span>
+<span id="cb5-24"><a href="#cb5-24" aria-hidden="true" tabindex="-1"></a>ey_z1 <span class="ot">&lt;-</span> <span class="fu">glmnet</span>(<span class="at">x =</span> iv_X[id_z1, ], <span class="at">y =</span> iv_data<span class="sc">$</span>tw[id_z1], <span class="at">lambda =</span> lambda)</span>
+<span id="cb5-25"><a href="#cb5-25" aria-hidden="true" tabindex="-1"></a>ey_z1_selected <span class="ot">&lt;-</span> <span class="fu">names</span>((c <span class="ot">&lt;-</span> <span class="fu">coef</span>(ey_z1))[(<span class="fu">drop</span>(c) <span class="sc">!=</span> <span class="dv">0</span>), ])</span>
+<span id="cb5-26"><a href="#cb5-26" aria-hidden="true" tabindex="-1"></a>ey_z1_post_data <span class="ot">&lt;-</span> <span class="fu">cbind</span>(<span class="at">tw =</span> iv_data<span class="sc">$</span>tw[id_z1], <span class="fu">as.matrix</span>(iv_X[id_z1, ]))</span>
+<span id="cb5-27"><a href="#cb5-27" aria-hidden="true" tabindex="-1"></a>ey_z1_post_form <span class="ot">&lt;-</span> <span class="fu">paste</span>(<span class="st">"tw ~"</span>, <span class="fu">paste0</span>(ey_z1_selected[<span class="sc">-</span><span class="dv">1</span>], <span class="at">collapse =</span> <span class="st">"+"</span>))</span>
+<span id="cb5-28"><a href="#cb5-28" aria-hidden="true" tabindex="-1"></a>ey_z1_lm <span class="ot">&lt;-</span> <span class="fu">lm</span>(<span class="fu">formula</span>(ey_z1_post_form), <span class="at">data =</span> <span class="fu">as.data.frame</span>(ey_z1_post_data))</span>
+<span id="cb5-29"><a href="#cb5-29" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-30"><a href="#cb5-30" aria-hidden="true" tabindex="-1"></a><span class="do">## Treatment Post-LASSO model</span></span>
+<span id="cb5-31"><a href="#cb5-31" aria-hidden="true" tabindex="-1"></a>ed_z1 <span class="ot">&lt;-</span> <span class="fu">glmnet</span>(</span>
+<span id="cb5-32"><a href="#cb5-32" aria-hidden="true" tabindex="-1"></a>  <span class="at">x =</span> iv_X[id_z1, ],</span>
+<span id="cb5-33"><a href="#cb5-33" aria-hidden="true" tabindex="-1"></a>  <span class="at">y =</span> iv_data<span class="sc">$</span>p401[id_z1],</span>
+<span id="cb5-34"><a href="#cb5-34" aria-hidden="true" tabindex="-1"></a>  <span class="at">family =</span> <span class="st">"binomial"</span>,</span>
+<span id="cb5-35"><a href="#cb5-35" aria-hidden="true" tabindex="-1"></a>  <span class="at">lambda =</span> logit_lambda</span>
+<span id="cb5-36"><a href="#cb5-36" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb5-37"><a href="#cb5-37" aria-hidden="true" tabindex="-1"></a>ed_z1_selected <span class="ot">&lt;-</span> <span class="fu">names</span>((c <span class="ot">&lt;-</span> <span class="fu">coef</span>(ed_z1))[(<span class="fu">drop</span>(c) <span class="sc">!=</span> <span class="dv">0</span>), ])</span>
+<span id="cb5-38"><a href="#cb5-38" aria-hidden="true" tabindex="-1"></a>ed_z1_post_data <span class="ot">&lt;-</span> <span class="fu">cbind</span>(<span class="at">p401 =</span> iv_data<span class="sc">$</span>p401[id_z1], <span class="fu">as.matrix</span>(iv_X[id_z1, ]))</span>
+<span id="cb5-39"><a href="#cb5-39" aria-hidden="true" tabindex="-1"></a>ed_z1_post_form <span class="ot">&lt;-</span> <span class="fu">paste</span>(<span class="st">"p401 ~"</span>, <span class="fu">paste0</span>(ed_z1_selected[<span class="sc">-</span><span class="dv">1</span>], <span class="at">collapse =</span> <span class="st">"+"</span>))</span>
+<span id="cb5-40"><a href="#cb5-40" aria-hidden="true" tabindex="-1"></a>ed_z1_lm <span class="ot">&lt;-</span> <span class="fu">glm</span>(</span>
+<span id="cb5-41"><a href="#cb5-41" aria-hidden="true" tabindex="-1"></a>  <span class="fu">formula</span>(ed_z1_post_form),</span>
+<span id="cb5-42"><a href="#cb5-42" aria-hidden="true" tabindex="-1"></a>  <span class="at">family =</span> <span class="st">"binomial"</span>,</span>
+<span id="cb5-43"><a href="#cb5-43" aria-hidden="true" tabindex="-1"></a>  <span class="at">data =</span> <span class="fu">as.data.frame</span>(ed_z1_post_data)</span>
+<span id="cb5-44"><a href="#cb5-44" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb5-45"><a href="#cb5-45" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-46"><a href="#cb5-46" aria-hidden="true" tabindex="-1"></a><span class="co"># Estimate instrument as a function of X; Post-LASSO</span></span>
+<span id="cb5-47"><a href="#cb5-47" aria-hidden="true" tabindex="-1"></a>ez <span class="ot">&lt;-</span> <span class="fu">glmnet</span>(</span>
+<span id="cb5-48"><a href="#cb5-48" aria-hidden="true" tabindex="-1"></a>  <span class="at">x =</span> iv_X,</span>
+<span id="cb5-49"><a href="#cb5-49" aria-hidden="true" tabindex="-1"></a>  <span class="at">y =</span> iv_data<span class="sc">$</span>e401,</span>
+<span id="cb5-50"><a href="#cb5-50" aria-hidden="true" tabindex="-1"></a>  <span class="at">family =</span> <span class="st">"binomial"</span>,</span>
+<span id="cb5-51"><a href="#cb5-51" aria-hidden="true" tabindex="-1"></a>  <span class="at">lambda =</span> logit_lambda</span>
+<span id="cb5-52"><a href="#cb5-52" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb5-53"><a href="#cb5-53" aria-hidden="true" tabindex="-1"></a>ez_selected <span class="ot">&lt;-</span> <span class="fu">names</span>((c <span class="ot">&lt;-</span> <span class="fu">coef</span>(ez))[(<span class="fu">drop</span>(c) <span class="sc">!=</span> <span class="dv">0</span>), ])</span>
+<span id="cb5-54"><a href="#cb5-54" aria-hidden="true" tabindex="-1"></a>ez_post_data <span class="ot">&lt;-</span> <span class="fu">cbind</span>(<span class="at">e401 =</span> iv_data<span class="sc">$</span>e401, <span class="fu">as.matrix</span>(iv_X))</span>
+<span id="cb5-55"><a href="#cb5-55" aria-hidden="true" tabindex="-1"></a>ez_post_form <span class="ot">&lt;-</span> <span class="fu">paste</span>(<span class="st">"e401 ~"</span>, <span class="fu">paste0</span>(ez_selected[<span class="sc">-</span><span class="dv">1</span>], <span class="at">collapse =</span> <span class="st">"+"</span>))</span>
+<span id="cb5-56"><a href="#cb5-56" aria-hidden="true" tabindex="-1"></a>ez_lm <span class="ot">&lt;-</span> <span class="fu">glm</span>(</span>
+<span id="cb5-57"><a href="#cb5-57" aria-hidden="true" tabindex="-1"></a>  <span class="fu">formula</span>(ez_post_form),</span>
+<span id="cb5-58"><a href="#cb5-58" aria-hidden="true" tabindex="-1"></a>  <span class="at">family =</span> <span class="st">"binomial"</span>,</span>
+<span id="cb5-59"><a href="#cb5-59" aria-hidden="true" tabindex="-1"></a>  <span class="at">data =</span> <span class="fu">as.data.frame</span>(ez_post_data)</span>
+<span id="cb5-60"><a href="#cb5-60" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</div>
+</section>
+<section id="calculate-late" class="level3">
+<h3 class="anchored" data-anchor-id="calculate-late">Calculate LATE</h3>
+<div class="justify">
+<p>Now, that we’ve estimated models for the expected value of <span class="math inline">\(Y\)</span> and <span class="math inline">\(D\)</span> under the different values of our instrument <span class="math inline">\(Z\)</span>, let’s create a data.frame that has the estimated expected values of these variables for every observation. As is standard (and implemented in the paper), we will trim observations to ensure that estimated propensities of our instrument are bounded away from <span class="math inline">\({0, 1}\)</span>.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb6"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a>prediction_data <span class="ot">&lt;-</span> <span class="fu">as.data.frame</span>(<span class="fu">as.matrix</span>(iv_X))</span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>iv_expected_values <span class="ot">&lt;-</span> <span class="fu">data.frame</span>(</span>
+<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>  <span class="at">y =</span> iv_data<span class="sc">$</span>tw,</span>
+<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a>  <span class="at">d =</span> iv_data<span class="sc">$</span>p401,</span>
+<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a>  <span class="at">z =</span> iv_data<span class="sc">$</span>e401,</span>
+<span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a>  <span class="at">ey_z0 =</span> <span class="fu">predict</span>(ey_z0_lm, prediction_data),</span>
+<span id="cb6-7"><a href="#cb6-7" aria-hidden="true" tabindex="-1"></a>  <span class="at">ey_z1 =</span> <span class="fu">predict</span>(ey_z0_lm, prediction_data),</span>
+<span id="cb6-8"><a href="#cb6-8" aria-hidden="true" tabindex="-1"></a>  <span class="at">ed_z0 =</span> <span class="dv">0</span>,</span>
+<span id="cb6-9"><a href="#cb6-9" aria-hidden="true" tabindex="-1"></a>  <span class="at">ed_z1 =</span> <span class="fu">predict</span>(ed_z1_lm, prediction_data, <span class="at">type =</span> <span class="st">"response"</span>),</span>
+<span id="cb6-10"><a href="#cb6-10" aria-hidden="true" tabindex="-1"></a>  <span class="at">ez =</span> <span class="fu">predict</span>(ez_lm, prediction_data, <span class="at">type =</span> <span class="st">"response"</span>)</span>
+<span id="cb6-11"><a href="#cb6-11" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb6-12"><a href="#cb6-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-13"><a href="#cb6-13" aria-hidden="true" tabindex="-1"></a><span class="co"># Trim instrument propensity scores -- No observations are dropped here</span></span>
+<span id="cb6-14"><a href="#cb6-14" aria-hidden="true" tabindex="-1"></a>iv_expected_values <span class="ot">&lt;-</span> iv_expected_values <span class="sc">|&gt;</span></span>
+<span id="cb6-15"><a href="#cb6-15" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(ez <span class="sc">&gt;=</span> <span class="fl">1e-12</span> <span class="sc">&amp;</span> ez <span class="sc">&lt;=</span> (<span class="dv">1</span> <span class="sc">-</span> <span class="fl">1e-12</span>))</span>
+<span id="cb6-16"><a href="#cb6-16" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-17"><a href="#cb6-17" aria-hidden="true" tabindex="-1"></a><span class="co"># Estimate LATE plug-in values</span></span>
+<span id="cb6-18"><a href="#cb6-18" aria-hidden="true" tabindex="-1"></a>iv_expected_values <span class="ot">&lt;-</span> iv_expected_values <span class="sc">|&gt;</span></span>
+<span id="cb6-19"><a href="#cb6-19" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(</span>
+<span id="cb6-20"><a href="#cb6-20" aria-hidden="true" tabindex="-1"></a>    <span class="at">ay_1 =</span> z<span class="sc">*</span>(y <span class="sc">-</span> ey_z1)<span class="sc">/</span>ez <span class="sc">+</span> ey_z1,</span>
+<span id="cb6-21"><a href="#cb6-21" aria-hidden="true" tabindex="-1"></a>    <span class="at">ay_0 =</span> (<span class="dv">1</span> <span class="sc">-</span> z)<span class="sc">*</span>(y <span class="sc">-</span> ey_z0)<span class="sc">/</span>(<span class="dv">1</span> <span class="sc">-</span> ez) <span class="sc">+</span> ey_z0,</span>
+<span id="cb6-22"><a href="#cb6-22" aria-hidden="true" tabindex="-1"></a>    <span class="at">ad_1 =</span> z<span class="sc">*</span>(d <span class="sc">-</span> ed_z1)<span class="sc">/</span>ez <span class="sc">+</span> ed_z1,</span>
+<span id="cb6-23"><a href="#cb6-23" aria-hidden="true" tabindex="-1"></a>    <span class="at">ad_0 =</span> <span class="dv">0</span>,</span>
+<span id="cb6-24"><a href="#cb6-24" aria-hidden="true" tabindex="-1"></a>    <span class="at">LATE =</span> (ay_1 <span class="sc">-</span> ay_0)<span class="sc">/</span>(ad_1 <span class="sc">-</span> ad_0)</span>
+<span id="cb6-25"><a href="#cb6-25" aria-hidden="true" tabindex="-1"></a>  )</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</div>
+</section>
+<section id="confidence-via-bootstrap" class="level3">
+<h3 class="anchored" data-anchor-id="confidence-via-bootstrap">Confidence via Bootstrap</h3>
+<div class="justify">
+<p>Now that we’ve estimated the plug-in values, let’s calculate the LATE and generate a confidence interval using the described multiplier bootstrap.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb7"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Calculate LATE</span></span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>mean_ay_1 <span class="ot">&lt;-</span> <span class="fu">mean</span>(iv_expected_values<span class="sc">$</span>ay_1)</span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a>mean_ay_0 <span class="ot">&lt;-</span> <span class="fu">mean</span>(iv_expected_values<span class="sc">$</span>ay_0)</span>
+<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a>mean_ad_1 <span class="ot">&lt;-</span> <span class="fu">mean</span>(iv_expected_values<span class="sc">$</span>ad_1)</span>
+<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a>mean_ad_0 <span class="ot">&lt;-</span> <span class="fu">mean</span>(iv_expected_values<span class="sc">$</span>ad_0)</span>
+<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a>LATE <span class="ot">&lt;-</span> (mean_ay_1 <span class="sc">-</span> mean_ay_0)<span class="sc">/</span>(mean_ad_1 <span class="sc">-</span> mean_ad_0)</span>
+<span id="cb7-7"><a href="#cb7-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-8"><a href="#cb7-8" aria-hidden="true" tabindex="-1"></a><span class="co"># Confidence intervals: both analytic and bootstrap</span></span>
+<span id="cb7-9"><a href="#cb7-9" aria-hidden="true" tabindex="-1"></a>analytic_se <span class="ot">&lt;-</span> <span class="fu">sqrt</span>(</span>
+<span id="cb7-10"><a href="#cb7-10" aria-hidden="true" tabindex="-1"></a>  (<span class="dv">1</span><span class="sc">/</span>(<span class="fu">nrow</span>(iv_expected_values) <span class="sc">-</span> <span class="dv">1</span>))</span>
+<span id="cb7-11"><a href="#cb7-11" aria-hidden="true" tabindex="-1"></a>  <span class="sc">*</span> <span class="fu">sum</span>(</span>
+<span id="cb7-12"><a href="#cb7-12" aria-hidden="true" tabindex="-1"></a>    (</span>
+<span id="cb7-13"><a href="#cb7-13" aria-hidden="true" tabindex="-1"></a>      (iv_expected_values<span class="sc">$</span>ay_1 <span class="sc">-</span> iv_expected_values<span class="sc">$</span>ay_0)</span>
+<span id="cb7-14"><a href="#cb7-14" aria-hidden="true" tabindex="-1"></a>      <span class="sc">/</span>(mean_ad_1 <span class="sc">-</span> mean_ad_0)</span>
+<span id="cb7-15"><a href="#cb7-15" aria-hidden="true" tabindex="-1"></a>      <span class="sc">-</span> LATE</span>
+<span id="cb7-16"><a href="#cb7-16" aria-hidden="true" tabindex="-1"></a>    )<span class="sc">^</span><span class="dv">2</span></span>
+<span id="cb7-17"><a href="#cb7-17" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb7-18"><a href="#cb7-18" aria-hidden="true" tabindex="-1"></a>  <span class="sc">/</span><span class="fu">nrow</span>(iv_expected_values)</span>
+<span id="cb7-19"><a href="#cb7-19" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb7-20"><a href="#cb7-20" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-21"><a href="#cb7-21" aria-hidden="true" tabindex="-1"></a><span class="co"># Function to generate multiplier weights</span></span>
+<span id="cb7-22"><a href="#cb7-22" aria-hidden="true" tabindex="-1"></a>mw <span class="ot">&lt;-</span> <span class="cf">function</span>(n) {</span>
+<span id="cb7-23"><a href="#cb7-23" aria-hidden="true" tabindex="-1"></a>  <span class="dv">1</span> <span class="sc">+</span> <span class="fu">rnorm</span>(n)<span class="sc">/</span><span class="fu">sqrt</span>(<span class="dv">2</span>) <span class="sc">+</span> (<span class="fu">rnorm</span>(n)<span class="sc">^</span><span class="dv">2</span> <span class="sc">-</span> <span class="dv">1</span>)<span class="sc">/</span><span class="dv">2</span></span>
+<span id="cb7-24"><a href="#cb7-24" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb7-25"><a href="#cb7-25" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-26"><a href="#cb7-26" aria-hidden="true" tabindex="-1"></a>bootstrap_LATEs <span class="ot">&lt;-</span> <span class="fu">vapply</span>(</span>
+<span id="cb7-27"><a href="#cb7-27" aria-hidden="true" tabindex="-1"></a>  <span class="dv">1</span><span class="sc">:</span><span class="dv">500</span>,</span>
+<span id="cb7-28"><a href="#cb7-28" aria-hidden="true" tabindex="-1"></a>  <span class="cf">function</span>(i) {</span>
+<span id="cb7-29"><a href="#cb7-29" aria-hidden="true" tabindex="-1"></a>    weights <span class="ot">&lt;-</span> <span class="fu">mw</span>(<span class="fu">nrow</span>(iv_expected_values))</span>
+<span id="cb7-30"><a href="#cb7-30" aria-hidden="true" tabindex="-1"></a>    (</span>
+<span id="cb7-31"><a href="#cb7-31" aria-hidden="true" tabindex="-1"></a>      <span class="fu">mean</span>((iv_expected_values<span class="sc">$</span>ay_1 <span class="sc">-</span> iv_expected_values<span class="sc">$</span>ay_0)<span class="sc">*</span>weights)</span>
+<span id="cb7-32"><a href="#cb7-32" aria-hidden="true" tabindex="-1"></a>      <span class="sc">/</span><span class="fu">mean</span>((iv_expected_values<span class="sc">$</span>ad_1 <span class="sc">-</span> iv_expected_values<span class="sc">$</span>ad_0)<span class="sc">*</span>weights)</span>
+<span id="cb7-33"><a href="#cb7-33" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb7-34"><a href="#cb7-34" aria-hidden="true" tabindex="-1"></a>  },</span>
+<span id="cb7-35"><a href="#cb7-35" aria-hidden="true" tabindex="-1"></a>  <span class="fu">numeric</span>(<span class="dv">1</span>)</span>
+<span id="cb7-36"><a href="#cb7-36" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb7-37"><a href="#cb7-37" aria-hidden="true" tabindex="-1"></a>bootstrap_se <span class="ot">&lt;-</span> (</span>
+<span id="cb7-38"><a href="#cb7-38" aria-hidden="true" tabindex="-1"></a>  (<span class="fu">quantile</span>(bootstrap_LATEs, .<span class="dv">75</span>) <span class="sc">-</span> <span class="fu">quantile</span>(bootstrap_LATEs, .<span class="dv">25</span>))</span>
+<span id="cb7-39"><a href="#cb7-39" aria-hidden="true" tabindex="-1"></a>  <span class="sc">/</span> (<span class="fu">qnorm</span>(.<span class="dv">75</span>) <span class="sc">-</span> <span class="fu">qnorm</span>(.<span class="dv">25</span>))</span>
+<span id="cb7-40"><a href="#cb7-40" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div class="cell">
+<div class="cell-output cell-output-stdout">
+<pre><code>LATE: 8391.53 (3305.03) {3098.99}</code></pre>
+</div>
+</div>
+</div>
+</section>
+</section>
+<section id="conclusion" class="level2">
+<h2 class="anchored" data-anchor-id="conclusion">Conclusion</h2>
+<div class="justify">
+<p>And voila, we’ve estimated the LATE using IV estimation in a high-dimensional setting! A specific, but very useful, case of this general framework is when we want to directly estimate the effect of a treatment variable that is conditionally exogenous. In that case, we can execute the algorithm shown above, but setting <span class="math inline">\(Z = D\)</span>. Other than that, everything is exactly the same.</p>
+<section id="hdm-package" class="level3">
+<h3 class="anchored" data-anchor-id="hdm-package">HDM Package</h3>
+<p>If you want a quick and easy implementation for these methods, check out the <a href="https://cran.r-project.org/web/packages/hdm/index.html"><code>hdm</code> package</a>. The package is relatively easy-to-follow, and also works with sparse matrices right out of the box, which is nice. It’s not the most user-friendly package, but it seems to get the job done.</p>
+</section>
+</div>
+
+
+</section>
+
+</main> <!-- /main -->
+<script id="quarto-html-after-body" type="application/javascript">
+window.document.addEventListener("DOMContentLoaded", function (event) {
+  const toggleBodyColorMode = (bsSheetEl) => {
+    const mode = bsSheetEl.getAttribute("data-mode");
+    const bodyEl = window.document.querySelector("body");
+    if (mode === "dark") {
+      bodyEl.classList.add("quarto-dark");
+      bodyEl.classList.remove("quarto-light");
+    } else {
+      bodyEl.classList.add("quarto-light");
+      bodyEl.classList.remove("quarto-dark");
+    }
+  }
+  const toggleBodyColorPrimary = () => {
+    const bsSheetEl = window.document.querySelector("link#quarto-bootstrap");
+    if (bsSheetEl) {
+      toggleBodyColorMode(bsSheetEl);
+    }
+  }
+  toggleBodyColorPrimary();  
+  const icon = "";
+  const anchorJS = new window.AnchorJS();
+  anchorJS.options = {
+    placement: 'right',
+    icon: icon
+  };
+  anchorJS.add('.anchored');
+  const clipboard = new window.ClipboardJS('.code-copy-button', {
+    target: function(trigger) {
+      return trigger.previousElementSibling;
+    }
+  });
+  clipboard.on('success', function(e) {
+    // button target
+    const button = e.trigger;
+    // don't keep focus
+    button.blur();
+    // flash "checked"
+    button.classList.add('code-copy-button-checked');
+    var currentTitle = button.getAttribute("title");
+    button.setAttribute("title", "Copied!");
+    setTimeout(function() {
+      button.setAttribute("title", currentTitle);
+      button.classList.remove('code-copy-button-checked');
+    }, 1000);
+    // clear code selection
+    e.clearSelection();
+  });
+  function tippyHover(el, contentFn) {
+    const config = {
+      allowHTML: true,
+      content: contentFn,
+      maxWidth: 500,
+      delay: 100,
+      arrow: false,
+      appendTo: function(el) {
+          return el.parentElement;
+      },
+      interactive: true,
+      interactiveBorder: 10,
+      theme: 'quarto',
+      placement: 'bottom-start'
+    };
+    window.tippy(el, config); 
+  }
+  const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+  for (var i=0; i<noterefs.length; i++) {
+    const ref = noterefs[i];
+    tippyHover(ref, function() {
+      // use id or data attribute instead here
+      let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+      try { href = new URL(href).hash; } catch {}
+      const id = href.replace(/^#\/?/, "");
+      const note = window.document.getElementById(id);
+      return note.innerHTML;
+    });
+  }
+  var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+  for (var i=0; i<bibliorefs.length; i++) {
+    const ref = bibliorefs[i];
+    const cites = ref.parentNode.getAttribute('data-cites').split(' ');
+    tippyHover(ref, function() {
+      var popup = window.document.createElement('div');
+      cites.forEach(function(cite) {
+        var citeDiv = window.document.createElement('div');
+        citeDiv.classList.add('hanging-indent');
+        citeDiv.classList.add('csl-entry');
+        var biblioDiv = window.document.getElementById('ref-' + cite);
+        if (biblioDiv) {
+          citeDiv.innerHTML = biblioDiv.innerHTML;
+        }
+        popup.appendChild(citeDiv);
+      });
+      return popup.innerHTML;
+    });
+  }
+});
+</script>
+</div> <!-- /content -->
+
+
+
+</body></html>
