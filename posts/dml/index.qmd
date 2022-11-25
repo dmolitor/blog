@@ -1,0 +1,861 @@
+---
+title: "Double/Debiased Machine Learning for Treatment and Structural Parameters"
+subtitle: "V. Chernozhukov, D. Chetverikov, M. Demirer, E. Duflo, C. Hansen, W. Newey, J. Robins"
+description: "Obtain valid inferential statements about a low-dimensional parameter (ATE/LATE) in the presence of potentially high-dimensional confounding using modern ML methods."
+date: "2022-11-23"
+format:
+  html:
+    toc: true
+    toc-location: left
+    code-overflow: scroll
+    theme: sandstone
+    highlight: espresso
+categories: [ML, Causal Inference]
+image: "./thumbnail.jpeg"
+---
+```{css, echo = FALSE}
+.justify {
+  text-align: justify !important
+}
+```
+
+::: {.justify}
+
+Double/Debiased Machine Learning, proposed by
+[Chernozhukov et al.](https://academic.oup.com/ectj/article/21/1/C1/5056401),
+tackles the problem of inference on some
+parameter, $\theta_0$, in the setting where there is a potentially
+high-dimensional set of control variables/confounders. To do so, this method
+harnesses generic ML algorithms which perform well in high-dimensional settings.
+DML can be applied to learn the ATE and LATE in a partially linear regression
+model and partially linear instrumental variables model, respectively. It
+can also be used to estimate the ATE and LATE in the interactive model and
+interactive instrumental variables model, where treatment effects are fully
+heterogeneous.
+
+This post is going to show how to implement estimation of the ATE and LATE
+in both the partially linear and interactive settings. This will be a pretty
+minimal prototype, implemented entirely in base R. I'll use a couple other
+packages for the ML methods, but which models you choose to use are entirely
+separate from the general method outlined here.
+
+:::
+
+## Packages
+```{r}
+#| warning: false
+#| message: false
+#| label: Packages
+library(estimatr)
+library(glmnet)
+library(hdm)
+library(ranger)
+```
+
+## Data
+
+::: {.justify}
+
+For clarity, we'll use one of the same
+[empirical examples](https://academic.oup.com/ectj/article/21/1/C1/5056401#130274213)
+used in the actual paper. This example is described as follows:
+
+> We use the DML method to estimate the effect of 401(k) eligibility, the 
+treatment variable, and 401(k) participation, a self‐selected decision to
+receive the treatment that we instrument for with assignment to the treatment
+state, on accumulated assets. In this example, the treatment variable is not
+randomly assigned and we aim to eliminate the potential biases due to the lack
+of random assignment by flexibly controlling for a rich set of variables.
+
+:::
+
+```{r}
+#| warning: false
+#| message: false
+#| label: Data Setup
+data(pension)
+pension <- pension[sample(1:nrow(pension), nrow(pension)), ]
+
+# Construct model inputs
+form <- ~ (
+  poly(age, 2) + poly(inc, 2) + poly(educ, 2) + poly(fsize,2)
+  + as.factor(marr) + as.factor(twoearn) + as.factor(db) + as.factor(pira)
+  + as.factor(hown)
+)^2
+X <- model.matrix(form, data = pension)
+X_RF <- pension[, c("age", "inc", "fsize", "educ", "db", "marr", "twoearn", "pira", "hown")]
+D <- pension$e401
+Y <- pension$net_tfa
+```
+
+::: {.justify}
+
+Now, let's define a few simple functions for applying three different ML models
+(Random Forest, LASSO, and ElasticNet with $\alpha = 0.5$) to our data. These
+three models will be used across each of the four DML estimation strategies.
+
+:::
+
+```{r}
+#| warning: false
+#| message: false
+#| label: ML Functions
+# LASSO learner and prediction functions
+y_learner_lasso <- \(x, y) cv.glmnet(x, y, nfolds = 5)
+d_learner_lasso <- \(x, y) cv.glmnet(x, y, nfolds = 5, family = "binomial")
+pred_fn_lasso <- \(mod, data) predict(mod, data,"lambda.min", "response")
+
+# ElasticNet learner and prediction functions
+y_learner_enet <- \(x, y) cv.glmnet(x, y, nfolds = 5, alpha = 0.5)
+d_learner_enet <- \(x, y) cv.glmnet(x, y, nfolds = 5, alpha = 0.5, family = "binomial")
+pred_fn_enet <- \(mod, data) predict(mod, data, "lambda.min", "response")
+
+# Random Forest learner and prediction functions
+y_learner_rf <- \(x, y) ranger(x = x, y = y, num.trees = 1000)
+d_learner_rf <- \(x, y) ranger(x = x, y = y, num.trees = 1000, probability = TRUE)
+pred_fn_rf_y <- \(mod, data) predict(mod, data)$predictions
+pred_fn_rf_d <- \(mod, data) predict(mod, data)$predictions[, "1"]
+```
+
+## Estimating the ATE of 401(k) Eligibility on Net Financial Assets
+
+::: {.justify}
+
+> In the example in this paper, we use the same data as in
+[Chernozhukov and Hansen (2004)](http://dx.doi.org/10.1162/0034653041811734).
+We use net financial assets – defined as the sum of IRA balances, 401(k)
+balances, checking accounts, US saving bonds, other interest‐earning 
+accounts in banks and other financial institutions, other 
+interest‐earning assets (such as bonds held personally), stocks, and mutual 
+funds less non‐mortgage debt – as the outcome variable, Y, in our analysis. 
+Our treatment variable, D, is an indicator for being eligible to enroll in a 
+401(k) plan. The vector of raw covariates, X, consists of age, income, 
+family size, years of education, a married indicator, a two‐earner status 
+indicator, a defined benefit pension status indicator, an IRA participation 
+indicator, and a home‐ownership indicator.
+
+:::
+
+### Partially Linear Regression Model
+
+::: {.justify}
+
+First we will calculate the ATE of 401(k) eligibility on net financial
+assets in the partially linear model.
+
+The following function implements DML for the partially linear model.
+
+:::
+
+```{r}
+#| warning: false
+#| message: false
+#| label: PLM Function
+dml_plm <- function(X, Y, D, y_learner, d_learner, pred_fn_y, pred_fn_d = pred_fn_y) {
+  
+  # Create folds for sample splitting
+  fold1 <- sample(1:nrow(X), size = round((1/3)*nrow(X)))
+  fold2 <- sample((1:nrow(X))[-fold1], size = round((1/3)*nrow(X)))
+  fold3 <- (1:nrow(X))[-c(fold1, fold2)]
+  
+  # Create data.frame to store residuals
+  resids <- data.frame()
+  
+  # Generate outcome model across folds
+  for (fold in list(fold1, fold2, fold3)) {
+    
+    # Get the training/prediction indices
+    idx_train <- (1:nrow(X))[-fold]
+    idx_predict <- fold
+    
+    # Outcome prediction model
+    outcome_model <- y_learner(
+      x = X[idx_train, , drop = FALSE],
+      y = Y[idx_train]
+    )
+    
+    # Residualize outcome
+    outcome_predictions <- pred_fn_y(outcome_model, X[idx_predict, , drop = FALSE])
+    outcome_resids <- Y[idx_predict] - outcome_predictions
+    
+    # Treatment prediction model
+    treatment_model <- d_learner(
+      x = X[idx_train, , drop = FALSE],
+      y = D[idx_train]
+    )
+    
+    # Residualize treatment
+    treatment_predictions <- pred_fn_d(treatment_model, X[idx_predict, , drop = FALSE])
+    treatment_predictions <- pmin(pmax(treatment_predictions, 0.01), .99)
+    treatment_resids <- (
+      # This is necessary to deal with cases where D is a factor
+      as.numeric(as.character(D[idx_predict])) - treatment_predictions
+    )
+
+    # Collect residuals
+    new_resids <- data.frame(
+      "y_resid" = unname(outcome_resids),
+      "d_resid" = unname(treatment_resids),
+      "y_hat" = unname(outcome_predictions),
+      "d_hat" = unname(treatment_predictions),
+      "idx" = idx_predict
+    )
+    resids <- do.call(rbind, list(resids, new_resids))
+  }
+  
+  # Return data in original ordering
+  return(resids[order(resids[, "idx", drop = TRUE]), , drop = FALSE])
+  
+}
+```
+
+::: {.justify}
+
+Now that we've defined the function, let's estimate the ATE using our three
+different ML methods.
+
+:::
+
+```{r}
+#| warning: false
+#| message: false
+#| label: DML PLM
+# Estimate DML first stage
+set.seed(123)
+first_stage_lasso <- dml_plm(
+  X = X,
+  Y = Y,
+  D = D,
+  y_learner = y_learner_lasso,
+  d_learner = d_learner_lasso,
+  pred_fn_y = pred_fn_lasso
+)
+first_stage_enet <- dml_plm(
+  X = X,
+  Y = Y,
+  D = D,
+  y_learner = y_learner_enet,
+  d_learner = d_learner_enet,
+  pred_fn_y = pred_fn_enet
+)
+first_stage_rf <- dml_plm(
+  X = X_RF,
+  Y = Y,
+  D = factor(D),
+  y_learner = y_learner_rf,
+  d_learner = d_learner_rf,
+  pred_fn_y = pred_fn_rf_y,
+  pred_fn_d = pred_fn_rf_d
+)
+
+# Estimate the ATE using OLS
+ate_lasso <- lm_robust(y_resid ~ d_resid, first_stage_lasso, se_type = "HC1")
+ate_enet <- lm_robust(y_resid ~ d_resid, first_stage_enet, se_type = "HC1")
+ate_rf <- lm_robust(y_resid ~ d_resid, first_stage_rf, se_type = "HC1")
+```
+```{r}
+#| echo: false
+#| label: PLM Estimates Table
+# Estimates table
+estimates <- data.frame(
+  "LASSO" = c(
+    tidy(ate_lasso)$estimate[2],
+    tidy(ate_lasso)$std.error[2],
+    sqrt(mean((Y - first_stage_lasso$y_hat)^2)),
+    sqrt(mean((as.numeric(as.character(D)) - first_stage_lasso$d_hat)^2))
+  ),
+  "ElasticNet" = c(
+    tidy(ate_enet)$estimate[2],
+    tidy(ate_enet)$std.error[2],
+    sqrt(mean((Y - first_stage_enet$y_hat)^2)),
+    sqrt(mean((as.numeric(as.character(D)) - first_stage_enet$d_hat)^2))
+  ),
+  "RandomForest" = c(
+    tidy(ate_rf)$estimate[2],
+    tidy(ate_rf)$std.error[2],
+    sqrt(mean((Y - first_stage_rf$y_hat)^2)),
+    sqrt(mean((as.numeric(as.character(D)) - first_stage_rf$d_hat)^2))
+  ),
+  row.names = c("Estimate", "Std. Error", "RMSE Y", "RMSE D")
+)
+knitr::kable(estimates, digits = 3, format = "pipe")
+```
+
+### Interactive Regression Model
+
+::: {.justify}
+
+Now, we'll define the function to estimate the ATE in the fully heterogeneous
+model.
+
+:::
+
+```{r}
+#| warning: false
+#| message: false
+#| label: IRM Function
+dml_irm <- function(X,
+                    Y,
+                    D,
+                    y_learner,
+                    d_learner,
+                    pred_fn_y,
+                    pred_fn_d = pred_fn_y) {
+  
+  # Create folds for sample splitting
+  fold1 <- sample(1:nrow(X), size = round((1/3)*nrow(X)))
+  fold2 <- sample((1:nrow(X))[-fold1], size = round((1/3)*nrow(X)))
+  fold3 <- (1:nrow(X))[-c(fold1, fold2)]
+  
+  # Create data.frame to store residuals
+  resids <- data.frame()
+  
+  # Generate outcome model across folds
+  for (fold in list(fold1, fold2, fold3)) {
+    
+    # Get the training/prediction indices
+    idx_train <- (1:nrow(X))[-fold]
+    idx_predict <- fold
+    numD <- as.numeric(as.character(D))
+    
+    # Treatment prediction model
+    treatment_model <- d_learner(
+      x = X[idx_train, , drop = FALSE],
+      y = D[idx_train]
+    )
+    
+    # Residualize treatment
+    treatment_predictions <- pred_fn_d(treatment_model, X[idx_predict, , drop = FALSE])
+    treatment_predictions <- pmin(pmax(treatment_predictions, 0.01), .99)
+    treatment_resids <- (numD[idx_predict] - treatment_predictions)
+    
+    # Outcome prediction model
+    XD <- cbind("D" = numD, X)
+    outcome_model <- y_learner(
+      x = XD[idx_train, , drop = FALSE],
+      y = Y[idx_train]
+    )
+    
+    # Outcome predictions under control
+    XD[, "D"] <- 0
+    outcome_preds_d0 <- pred_fn_y(outcome_model, XD[idx_predict, , drop = FALSE])
+    
+    # Outcome predictions under treatment
+    XD[, "D"] <- 1
+    outcome_preds_d1 <- pred_fn_y(outcome_model, XD[idx_predict, , drop = FALSE])
+    outcome_predictions <- (
+      numD[idx_predict]*outcome_preds_d1
+      + (1 - numD[idx_predict])*outcome_preds_d0
+    )
+    
+    # Calculate individual level weights
+    outcome_resids <- Y[idx_predict] - outcome_predictions
+    inv_prop_scores <- (
+      numD[idx_predict]/treatment_predictions
+      - (1 - numD[idx_predict])/(1 - treatment_predictions)
+    )
+    expected_diff <- outcome_preds_d1 - outcome_preds_d0
+    effect_estimates <- expected_diff + inv_prop_scores*outcome_resids
+    
+    # Collect residuals
+    new_resids <- data.frame(
+      "effect_estimates" = unname(effect_estimates),
+      "y_resid" = unname(outcome_resids),
+      "d_resid" = unname(treatment_resids),
+      "y_hat" = unname(outcome_predictions),
+      "d_hat" = unname(treatment_predictions),
+      "idx" = idx_predict
+    )
+    resids <- do.call(rbind, list(resids, new_resids))
+  }
+  
+  # Return data in original ordering
+  return(resids[order(resids[, "idx", drop = TRUE]), , drop = FALSE])
+  
+}
+```
+
+Let's estimate the ATE!
+
+```{r}
+#| warning: false
+#| message: false
+#| label: DML IRM
+# Estimate DML first stage
+set.seed(123)
+first_stage_lasso <- dml_irm(
+  X = X,
+  Y = Y,
+  D = D,
+  y_learner = y_learner_lasso,
+  d_learner = d_learner_lasso,
+  pred_fn_y = pred_fn_lasso
+)
+first_stage_enet <- dml_irm(
+  X = X,
+  Y = Y,
+  D = D,
+  y_learner = y_learner_enet,
+  d_learner = d_learner_enet,
+  pred_fn_y = pred_fn_enet
+)
+first_stage_rf <- dml_irm(
+  X = X_RF,
+  Y = Y,
+  D = factor(D),
+  y_learner = y_learner_rf,
+  d_learner = d_learner_rf,
+  pred_fn_y = pred_fn_rf_y,
+  pred_fn_d = pred_fn_rf_d
+)
+
+# Estimate the ATE using OLS
+ate_lasso <- lm_robust(effect_estimates ~ 1, first_stage_lasso, se_type = "HC1")
+ate_enet <- lm_robust(effect_estimates ~ 1, first_stage_enet, se_type = "HC1")
+ate_rf <- lm_robust(effect_estimates ~ 1, first_stage_rf, se_type = "HC1")
+```
+```{r}
+#| echo: false
+#| label: IRM Estimates Table
+estimates <- data.frame(
+  "LASSO" = c(
+    tidy(ate_lasso)$estimate[1],
+    tidy(ate_lasso)$std.error[1],
+    sqrt(mean((Y - first_stage_lasso$y_hat)^2)),
+    sqrt(mean((as.numeric(as.character(D)) - first_stage_lasso$d_hat)^2))
+  ),
+  "ElasticNet" = c(
+    tidy(ate_enet)$estimate[1],
+    tidy(ate_enet)$std.error[1],
+    sqrt(mean((Y - first_stage_enet$y_hat)^2)),
+    sqrt(mean((as.numeric(as.character(D)) - first_stage_enet$d_hat)^2))
+  ),
+  "RandomForest" = c(
+    tidy(ate_rf)$estimate[1],
+    tidy(ate_rf)$std.error[1],
+    sqrt(mean((Y - first_stage_rf$y_hat)^2)),
+    sqrt(mean((as.numeric(as.character(D)) - first_stage_rf$d_hat)^2))
+  ),
+  row.names = c("Estimate", "Std. Error", "RMSE Y", "RMSE D")
+)
+knitr::kable(estimates, digits = 3, format = "pipe")
+```
+
+## Estimating the LATE of 401(k) Participation on Net Financial Assets
+
+::: {.justify}
+
+We now will estimate the LATE of 401(k) participation on net financial assets,
+using 401(k) eligibility as our instrument and 401(k) participation as our
+treatment.
+
+:::
+
+```{r}
+#| warning: false
+#| message: false
+#| label: Treatment and Instrument
+D <- pension$p401
+Z <- pension$e401
+```
+
+### Partially Linear IV Model
+
+::: {.justify}
+
+The following function estimates the partially linear IV model.
+
+:::
+
+```{r}
+#| warning: false
+#| message: false
+#| label: PLIVM Functions
+dml_plivm <- function(X,
+                      Y,
+                      D,
+                      Z,
+                      y_learner,
+                      d_learner,
+                      z_learner = d_learner,
+                      pred_fn_y,
+                      pred_fn_d = pred_fn_y,
+                      pred_fn_z = pred_fn_d) {
+  
+  # Create folds for sample splitting
+  fold1 <- sample(1:nrow(X), size = round((1/3)*nrow(X)))
+  fold2 <- sample((1:nrow(X))[-fold1], size = round((1/3)*nrow(X)))
+  fold3 <- (1:nrow(X))[-c(fold1, fold2)]
+  
+  # Create data.frame to store residuals
+  resids <- data.frame()
+  
+  # Generate outcome model across folds
+  for (fold in list(fold1, fold2, fold3)) {
+    
+    # Get the training/prediction indices
+    idx_train <- (1:nrow(X))[-fold]
+    idx_predict <- fold
+    
+    # Convert treatment and instrument to numeric
+    numD <- as.numeric(as.character(D[idx_predict]))
+    numZ <- as.numeric(as.character(Z[idx_predict]))
+    
+    # Outcome prediction model
+    outcome_model <- y_learner(
+      x = X[idx_train, , drop = FALSE],
+      y = Y[idx_train]
+    )
+    
+    # Residualize outcome
+    outcome_predictions <- pred_fn_y(outcome_model, X[idx_predict, , drop = FALSE])
+    outcome_resids <- Y[idx_predict] - outcome_predictions
+    
+    # Treatment prediction model
+    treatment_model <- d_learner(
+      x = X[idx_train, , drop = FALSE],
+      y = D[idx_train]
+    )
+    
+    # Residualize treatment
+    treatment_predictions <- pred_fn_d(treatment_model, X[idx_predict, , drop = FALSE])
+    treatment_resids <- numD - treatment_predictions
+    
+    # Instrument prediction model
+    instrument_model <- z_learner(
+      x = X[idx_train, , drop = FALSE],
+      y = Z[idx_train]
+    )
+    
+    # Residualize instrument
+    instrument_predictions <- pred_fn_z(instrument_model, X[idx_predict, , drop = FALSE])
+    instrument_predictions <- pmin(pmax(instrument_predictions, 0.01), .99)
+    instrument_resids <- numZ - instrument_predictions
+    
+    # Collect residuals
+    new_resids <- data.frame(
+      "y_resid" = unname(outcome_resids),
+      "d_resid" = unname(treatment_resids),
+      "z_resid" = unname(instrument_resids),
+      "y_hat" = unname(outcome_predictions),
+      "d_hat" = unname(treatment_predictions),
+      "z_hat" = unname(instrument_predictions),
+      "idx" = idx_predict
+    )
+    resids <- do.call(rbind, list(resids, new_resids))
+  }
+  
+  # Return data in original ordering
+  return(resids[order(resids[, "idx", drop = TRUE]), , drop = FALSE])
+  
+}
+```
+
+Let's estimate the LATE now!
+
+```{r}
+#| warning: false
+#| message: false
+#| label: DML PLIVM
+# Estimate DML first stage
+set.seed(123)
+first_stage_lasso <- dml_plivm(
+  X = X,
+  Y = Y,
+  D = D,
+  Z = Z,
+  y_learner = y_learner_lasso,
+  d_learner = d_learner_lasso,
+  pred_fn_y = pred_fn_lasso
+)
+first_stage_enet <- dml_plivm(
+  X = X,
+  Y = Y,
+  D = D,
+  Z = Z,
+  y_learner = y_learner_enet,
+  d_learner = d_learner_enet,
+  pred_fn_y = pred_fn_enet
+)
+first_stage_rf <- dml_plivm(
+  X = X_RF,
+  Y = Y,
+  D = factor(D),
+  Z = factor(Z),
+  y_learner = y_learner_rf,
+  d_learner = d_learner_rf,
+  pred_fn_y = pred_fn_rf_y,
+  pred_fn_d = pred_fn_rf_d
+)
+
+# TSLS with LASSO residuals
+d_hat_lasso <- lm(d_resid ~ z_resid, first_stage_lasso)$fitted.values
+ate_lasso <- lm_robust(first_stage_lasso$y_resid ~ d_hat_lasso, se_type = "HC1")
+
+# TSLS with LASSO residuals
+d_hat_enet <- lm(d_resid ~ z_resid, first_stage_enet)$fitted.values
+ate_enet <- lm_robust(first_stage_enet$y_resid ~ d_hat_enet, se_type = "HC1")
+
+# TSLS with RF residuals
+d_hat_rf <- lm(d_resid ~ z_resid, first_stage_rf)$fitted.values
+ate_rf <- lm_robust(first_stage_rf$y_resid ~ d_hat_rf, se_type = "HC1")
+```
+```{r}
+#| echo: false
+#| label: PLIVM Estimates Table
+estimates <- data.frame(
+  "LASSO" = c(
+    tidy(ate_lasso)$estimate[2],
+    tidy(ate_lasso)$std.error[2],
+    sqrt(mean((Y - first_stage_lasso$y_hat)^2)),
+    sqrt(mean((as.numeric(as.character(D)) - first_stage_lasso$d_hat)^2)),
+    sqrt(mean((as.numeric(as.character(Z)) - first_stage_lasso$z_hat)^2))
+  ),
+  "ElasticNet" = c(
+    tidy(ate_enet)$estimate[2],
+    tidy(ate_enet)$std.error[2],
+    sqrt(mean((Y - first_stage_enet$y_hat)^2)),
+    sqrt(mean((as.numeric(as.character(D)) - first_stage_enet$d_hat)^2)),
+    sqrt(mean((as.numeric(as.character(Z)) - first_stage_enet$z_hat)^2))
+  ),
+  "RandomForest" = c(
+    tidy(ate_rf)$estimate[2],
+    tidy(ate_rf)$std.error[2],
+    sqrt(mean((Y - first_stage_rf$y_hat)^2)),
+    sqrt(mean((as.numeric(as.character(D)) - first_stage_rf$d_hat)^2)),
+    sqrt(mean((as.numeric(as.character(Z)) - first_stage_rf$z_hat)^2))
+  ),
+  row.names = c("Estimate", "Std. Error", "RMSE Y", "RMSE D", "RMSE Z")
+)
+knitr::kable(estimates, digits = 3, format = "pipe")
+```
+
+### Interactive IV Model
+
+::: {.justify}
+
+Finally, the following function estimates the interactive IV model.
+
+:::
+
+```{r}
+#| warning: false
+#| message: false
+#| label: IIVM Functions
+dml_iivm <- function(X,
+                     Y,
+                     D,
+                     Z,
+                     y_learner,
+                     d_learner,
+                     z_learner = d_learner,
+                     pred_fn_y,
+                     pred_fn_d = pred_fn_y,
+                     pred_fn_z = pred_fn_d,
+                     always_takers = TRUE,
+                     never_takers = TRUE) {
+  
+  # Create folds for sample splitting
+  fold1 <- sample(1:nrow(X), size = round((1/3)*nrow(X)))
+  fold2 <- sample((1:nrow(X))[-fold1], size = round((1/3)*nrow(X)))
+  fold3 <- (1:nrow(X))[-c(fold1, fold2)]
+  
+  # Create data.frame to store residuals
+  resids <- data.frame()
+  
+  # Generate outcome model across folds
+  for (fold in list(fold1, fold2, fold3)) {
+    
+    # Get the training/prediction indices
+    idx_train <- (1:nrow(X))[-fold]
+    idx_predict <- fold
+    
+    # Convert treatment and instrument to numeric
+    numD <- as.numeric(as.character(D))
+    numZ <- as.numeric(as.character(Z))
+    
+    # Outcome model
+    XZ <- cbind("Z" = numZ, X)
+    outcome_model <- y_learner(
+      x = XZ[idx_train, , drop = FALSE],
+      y = Y[idx_train]
+    )
+    
+    # Outcome predictions under Instrument == 0
+    XZ[, "Z"] <- 0
+    outcome_preds_z0 <- pred_fn_y(outcome_model, XZ[idx_predict, , drop = FALSE])
+    
+    # Outcome predictions under Instrument == 1
+    XZ[, "Z"] <- 1
+    outcome_preds_z1 <- pred_fn_y(outcome_model, XZ[idx_predict, , drop = FALSE])
+    
+    # Outcome predictions and residuals
+    outcome_predictions <- (
+      numZ[idx_predict]*outcome_preds_z1
+      + (1 - numZ[idx_predict])*outcome_preds_z0
+    )
+    outcome_resids <- Y[idx_predict] - outcome_predictions
+    
+    # Treatment model
+    XZ <- cbind("Z" = numZ, X)
+    treatment_model <- d_learner(
+      x = XZ[idx_train, , drop = FALSE],
+      y = D[idx_train]
+    )
+    
+    # Treatment predictions under Instrument == 0
+    if (always_takers == FALSE) {
+      treatment_preds_z0 <- rep(0, length(D[idx_predict]))
+    } else {
+      XZ[, "Z"] <- 0
+      treatment_preds_z0 <- pred_fn_d(treatment_model, XZ[idx_predict, , drop = FALSE])
+    }
+    
+    # Treatment predictions under Instrument == 1
+    if (never_takers == FALSE) {
+      treatment_preds_z1 <- rep(1, length(D[idx_predict]))
+    } else {
+      XZ[, "Z"] <- 1
+      treatment_preds_z1 <- pred_fn_d(treatment_model, XZ[idx_predict, , drop = FALSE])
+    }
+    
+    # Treatment predictions and residuals
+    treatment_predictions <- (
+      numZ[idx_predict]*treatment_preds_z1
+      + (1 - numZ[idx_predict])*treatment_preds_z0
+    )
+    treatment_resids <- numD[idx_predict] - treatment_predictions
+    
+    # Instrument prediction model
+    instrument_model <- z_learner(
+      x = X[idx_train, , drop = FALSE],
+      y = Z[idx_train]
+    )
+    
+    # Instrument predictions and residuals
+    instrument_predictions <- pred_fn_z(instrument_model, X[idx_predict, , drop = FALSE])
+    treatment_predictions <- pmin(pmax(treatment_predictions, 0.01), .99)
+    instrument_resids <- numZ[idx_predict] - instrument_predictions
+    
+    # Construct effect estimates
+    effect_estimates <- (
+      (outcome_preds_z1 - outcome_preds_z0)
+      + (numZ[idx_predict]*(Y[idx_predict] - outcome_preds_z1))
+        /instrument_predictions
+      - ((1 - numZ[idx_predict])*(Y[idx_predict] - outcome_preds_z0))
+        /(1 - instrument_predictions)
+      - (
+        (treatment_preds_z1 - treatment_preds_z0)
+        + (numZ[idx_predict]*(numD[idx_predict] - treatment_preds_z1))
+          /instrument_predictions
+        - ((1 - numZ[idx_predict])*(numD[idx_predict] - treatment_preds_z0))
+          /(1 - instrument_predictions)
+      )
+    )
+    
+    # Collect residuals
+    new_resids <- data.frame(
+      "effect_estimates" = unname(effect_estimates),
+      "y_resid" = unname(outcome_resids),
+      "d_resid" = unname(treatment_resids),
+      "z_resid" = unname(instrument_resids),
+      "y_hat" = unname(outcome_predictions),
+      "d_hat" = unname(treatment_predictions),
+      "z_hat" = unname(instrument_predictions),
+      "idx" = idx_predict
+    )
+    resids <- do.call(rbind, list(resids, new_resids))
+  }
+  
+  # Return data in original ordering
+  return(resids[order(resids[, "idx", drop = TRUE]), , drop = FALSE])
+  
+}
+```
+
+Let's estimate the LATE now!
+
+```{r}
+#| warning: false
+#| message: false
+#| label: DML IIVM
+# Estimate DML first stage
+set.seed(123)
+first_stage_lasso <- dml_iivm(
+  X = X,
+  Y = Y,
+  D = D,
+  Z = Z,
+  y_learner = y_learner_lasso,
+  d_learner = d_learner_lasso,
+  pred_fn_y = pred_fn_lasso,
+  always_takers = FALSE
+)
+first_stage_enet <- dml_iivm(
+  X = X,
+  Y = Y,
+  D = D,
+  Z = Z,
+  y_learner = y_learner_enet,
+  d_learner = d_learner_enet,
+  pred_fn_y = pred_fn_enet,
+  always_takers = FALSE
+)
+first_stage_rf <- dml_iivm(
+  X = X_RF,
+  Y = Y,
+  D = factor(D),
+  Z = factor(Z),
+  y_learner = y_learner_rf,
+  d_learner = d_learner_rf,
+  pred_fn_y = pred_fn_rf_y,
+  pred_fn_d = pred_fn_rf_d,
+  always_takers = FALSE
+)
+
+# ATEs
+ate_lasso <- lm_robust(first_stage_lasso$effect_estimates ~ 1, se_type = "HC1")
+ate_enet <- lm_robust(first_stage_enet$effect_estimates ~ 1, se_type = "HC1")
+ate_rf <- lm_robust(first_stage_rf$effect_estimates ~ 1, se_type = "HC1")
+```
+```{r}
+#| echo: false
+#| label: IIVM Estimates Table
+estimates <- data.frame(
+  "LASSO" = c(
+    tidy(ate_lasso)$estimate[[1]],
+    tidy(ate_lasso)$std.error[[1]],
+    sqrt(mean((Y - first_stage_lasso$y_hat)^2)),
+    sqrt(mean((as.numeric(as.character(D)) - first_stage_lasso$d_hat)^2)),
+    sqrt(mean((as.numeric(as.character(Z)) - first_stage_lasso$z_hat)^2))
+  ),
+  "ElasticNet" = c(
+    tidy(ate_enet)$estimate[[1]],
+    tidy(ate_enet)$std.error[[1]],
+    sqrt(mean((Y - first_stage_enet$y_hat)^2)),
+    sqrt(mean((as.numeric(as.character(D)) - first_stage_enet$d_hat)^2)),
+    sqrt(mean((as.numeric(as.character(Z)) - first_stage_enet$z_hat)^2))
+  ),
+  "RandomForest" = c(
+    tidy(ate_rf)$estimate[[1]],
+    tidy(ate_rf)$std.error[[1]],
+    sqrt(mean((Y - first_stage_rf$y_hat)^2)),
+    sqrt(mean((as.numeric(as.character(D)) - first_stage_rf$d_hat)^2)),
+    sqrt(mean((as.numeric(as.character(Z)) - first_stage_rf$z_hat)^2))
+  ),
+  row.names = c("Estimate", "Std. Error", "RMSE Y", "RMSE D", "RMSE Z")
+)
+knitr::kable(estimates, digits = 3, format = "pipe")
+```
+
+## Conclusion
+
+::: {.justify}
+
+And that's it! There are some additional tidbits, for example estimating the
+ATTE instead of the ATE, estimating confidence intervals with a multiplier
+bootstrap, and dealing with multiple treatments, but this has covered (IMO) the
+essentials. This really helped me solidify the underlying estimation
+strategy, which I found very helpful.
+
+:::
