@@ -1,15 +1,15 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
-    <loc>https://github.com/dmolitor/blog/posts/causal-inf-high-dim/index.html</loc>
-    <lastmod>2022-11-25T21:59:55.612Z</lastmod>
+    <loc>https://github.com/dmolitor/blog/posts/dml/index.html</loc>
+    <lastmod>2022-12-23T20:58:13.016Z</lastmod>
   </url>
   <url>
-    <loc>https://github.com/dmolitor/blog/posts/dml/index.html</loc>
-    <lastmod>2022-11-25T21:59:56.744Z</lastmod>
+    <loc>https://github.com/dmolitor/blog/posts/causal-inf-high-dim/index.html</loc>
+    <lastmod>2022-12-23T20:58:13.976Z</lastmod>
   </url>
   <url>
     <loc>https://github.com/dmolitor/blog/index.html</loc>
-    <lastmod>2022-11-25T21:59:57.068Z</lastmod>
+    <lastmod>2022-12-23T20:58:14.304Z</lastmod>
   </url>
 </urlset>
