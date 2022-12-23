@@ -15,5 +15,6 @@ website:
 
 format:
   html:
+    mainfont: verdana
     theme: minty
     css: styles.css

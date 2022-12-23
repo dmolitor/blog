@@ -53,7 +53,7 @@
     "href": "index.html",
     "title": "Snippets of Things",
     "section": "",
-    "text": "V. Chernozhukov, D. Chetverikov, M. Demirer, E. Duflo, C. Hansen, W. Newey, J. Robins\n\n\n\n\nML\n\n\nCausal Inference\n\n\n\n\nObtain valid inferential statements about a low-dimensional parameter (ATE/LATE) in the presence of potentially high-dimensional confounding using modern ML methods.\n\n\n\n\n\n\nNov 23, 2022\n\n\n\n\n\n\n  \n\n\n\n\n\nA. Belloni, V. Chernozhukov, I. Fernandez-Val, C. Hansen\n\n\n\n\nML\n\n\nCausal Inference\n\n\n\n\nEstimators and honest confidence bands for a variety of treatment effects including local average (LATE) and average treatment effects (ATE) in data-rich environments.\n\n\n\n\n\n\nNov 8, 2022\n\n\n\n\n\n\nNo matching items"
+    "text": "Double/Debiased Machine Learning for Treatment and Structural Parameters\n\n\nV. Chernozhukov, D. Chetverikov, M. Demirer, E. Duflo, C. Hansen, W. Newey, J. Robins\n\n\n\n\nML\n\n\nCausal Inference\n\n\n\n\nObtain valid inferential statements about a low-dimensional parameter (ATE/LATE) in the presence of potentially high-dimensional confounding using modern ML methods.\n\n\n\n\n\n\nNov 23, 2022\n\n\n\n\n\n\n  \n\n\n\n\nProgram Evaluation and Causal Inference with High-Dimensional Data\n\n\nA. Belloni, V. Chernozhukov, I. Fernandez-Val, C. Hansen\n\n\n\n\nML\n\n\nCausal Inference\n\n\n\n\nEstimators and honest confidence bands for a variety of treatment effects including local average (LATE) and average treatment effects (ATE) in data-rich environments.\n\n\n\n\n\n\nNov 8, 2022\n\n\n\n\n\n\nNo matching items"
   },
   {
     "objectID": "posts/dml/index.html#estimating-the-late-of-401k-participation-on-net-financial-assets",
